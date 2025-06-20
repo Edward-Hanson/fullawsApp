@@ -73,7 +73,24 @@ jobs:
             --cli-input-json file://new-task-def.json
 
       - name: Update ECS Service
+        env:
+          SERVICE_NAME: ${{ env.SERVICE_NAME }}
+          CLUSTER_NAME: ${{ env.CLUSTER_NAME }}
         run: |
-          NEW_REVISION=$(aws ecs list-task-definitions --family-prefix $SERVICE_NAME --sort DESC --max-items 1 --query "taskDefinitionArns[0]" --output text)
+          echo "Service Name: $SERVICE_NAME"
+          echo "Cluster Name: $CLUSTER_NAME"
 
-          aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --task-definition $NEW_REVISION  --force-new-deployment
+          NEW_REVISION=$(aws ecs list-task-definitions \
+            --family-prefix "$SERVICE_NAME" \
+            --sort DESC \
+            --max-items 1 \
+            --query "taskDefinitionArns[0]" \
+            --output text)
+
+          echo "Latest task revision: $NEW_REVISION"
+
+          aws ecs update-service \
+            --cluster "$CLUSTER_NAME" \
+            --service "$SERVICE_NAME" \
+            --task-definition "$NEW_REVISION" \
+            --force-new-deployment
