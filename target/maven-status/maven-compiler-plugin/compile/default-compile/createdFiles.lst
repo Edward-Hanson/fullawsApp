@@ -1,0 +1,8 @@
+com\hanson\cloudbasedproject\cloudbasedproject\entities\ImageMetadata.class
+com\hanson\cloudbasedproject\cloudbasedproject\CloudbasedprojectApplication.class
+com\hanson\cloudbasedproject\cloudbasedproject\controller\ImageController.class
+com\hanson\cloudbasedproject\cloudbasedproject\dtos\ImageTransfer.class
+com\hanson\cloudbasedproject\cloudbasedproject\config\S3SDKClient.class
+com\hanson\cloudbasedproject\cloudbasedproject\service\ImageService.class
+com\hanson\cloudbasedproject\cloudbasedproject\exceptions\GlobalExceptionHandler.class
+com\hanson\cloudbasedproject\cloudbasedproject\repository\ImageMetadataRepository.class

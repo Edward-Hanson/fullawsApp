@@ -1,0 +1,8 @@
+C:\Users\EdwardHansonMensah\Desktop\Extra\projects\Spring\cloudbasedproject\src\main\java\com\hanson\cloudbasedproject\cloudbasedproject\CloudbasedprojectApplication.java
+C:\Users\EdwardHansonMensah\Desktop\Extra\projects\Spring\cloudbasedproject\src\main\java\com\hanson\cloudbasedproject\cloudbasedproject\config\S3SDKClient.java
+C:\Users\EdwardHansonMensah\Desktop\Extra\projects\Spring\cloudbasedproject\src\main\java\com\hanson\cloudbasedproject\cloudbasedproject\controller\ImageController.java
+C:\Users\EdwardHansonMensah\Desktop\Extra\projects\Spring\cloudbasedproject\src\main\java\com\hanson\cloudbasedproject\cloudbasedproject\dtos\ImageTransfer.java
+C:\Users\EdwardHansonMensah\Desktop\Extra\projects\Spring\cloudbasedproject\src\main\java\com\hanson\cloudbasedproject\cloudbasedproject\entities\ImageMetadata.java
+C:\Users\EdwardHansonMensah\Desktop\Extra\projects\Spring\cloudbasedproject\src\main\java\com\hanson\cloudbasedproject\cloudbasedproject\exceptions\GlobalExceptionHandler.java
+C:\Users\EdwardHansonMensah\Desktop\Extra\projects\Spring\cloudbasedproject\src\main\java\com\hanson\cloudbasedproject\cloudbasedproject\repository\ImageMetadataRepository.java
+C:\Users\EdwardHansonMensah\Desktop\Extra\projects\Spring\cloudbasedproject\src\main\java\com\hanson\cloudbasedproject\cloudbasedproject\service\ImageService.java
