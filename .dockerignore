@@ -1,8 +1,11 @@
-target/
-.git
-.gitignore
 README.md
 *.iml
 .idea/
 *.log
 .env
+target/test-classes
+target/generated-sources
+.git
+.gitignore
+Dockerfile
+*.md
