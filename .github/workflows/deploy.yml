@@ -8,7 +8,7 @@ env:
   AWS_REGION: eu-west-1
   ECR_REPO_NAME: cloudbasedproject-repo
   SERVICE_NAME: CloudBasedService
-  CLUSTER_NAME: !Ref ECSCluster
+  CLUSTER_NAME: w5lab-ECSCluster-lpPrZUsOAKYk
   CONTAINER_NAME: cloudbased-container
 
 jobs:
