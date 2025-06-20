@@ -1,0 +1,27 @@
+{
+  "family": "w5lab-CloudBasedService-pPOm3dfdVdTf",
+  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/<ECS_EXECUTION_ROLE_NAME>",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "cloudbased-container",
+      "image": "REPLACED_DURING_DEPLOYMENT",
+      "portMappings": [
+        {
+          "containerPort": 2020
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/cloudbasedproject",
+          "awslogs-region": "eu-west-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      }
+    }
+  ]
+}
