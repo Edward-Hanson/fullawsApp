@@ -74,13 +74,6 @@ jobs:
 
       - name: Update ECS Service
         run: |
-          NEW_REVISION=$(aws ecs list-task-definitions \
-            --family-prefix $SERVICE_NAME \
-            --sort DESC --max-items 1 \
-            --query "taskDefinitionArns[0]" --output text)
+          NEW_REVISION=$(aws ecs list-task-definitions --family-prefix $SERVICE_NAME --sort DESC --max-items 1 --query "taskDefinitionArns[0]" --output text)
 
-          aws ecs update-service \
-            --cluster $CLUSTER_NAME \
-            --service $SERVICE_NAME \
-            --task-definition $NEW_REVISION \
-            --force-new-deployment
+          aws ecs update-service --cluster $CLUSTER_NAME --service $SERVICE_NAME --task-definition $NEW_REVISION  --force-new-deployment
