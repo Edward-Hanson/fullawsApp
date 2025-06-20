@@ -1,6 +1,6 @@
 {
   "family": "w5lab-CloudBasedService-pPOm3dfdVdTf",
-  "executionRoleArn": "arn:aws:iam::<ACCOUNT_ID>:role/<ECS_EXECUTION_ROLE_NAME>",
+  "executionRoleArn": "arn:aws:iam::343218213563:role/w5lab-ECSTaskExecutionRole-yFzATpl0QQ2x",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "512",
