@@ -1,34 +1,42 @@
-name: Build and Deploy to Amazon ECR
+name: Build, Push, and Deploy to Amazon ECS via ECR
 
 on:
   push:
-    branches: [master]
+    branches: ["master"]
 
 env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-  ECR_REPO: ${{ secrets.ECR_REPOSITORY_NAME }}
-  IMAGE_TAG: latest
+  AWS_REGION: eu-west-1
+  ECR_REPO_NAME: cloudbasedproject-repo
+  SERVICE_NAME: CloudBasedService
+  CLUSTER_NAME: !Ref ECSCluster
+  CONTAINER_NAME: cloudbased-container
 
 jobs:
-  deploy:
-    name: Build Spring Boot and Push to ECR
+  build-and-deploy:
+    name: Build Docker Image and Deploy
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source
+      - name: Checkout Source
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
           java-version: '17'
+          distribution: 'temurin'
 
-      - name: Build JAR with Maven
+      - name: Cache Maven Packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven
+
+      - name: Build JAR File
         run: mvn clean package -DskipTests
 
-      - name: Configure AWS credentials
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -36,23 +44,38 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Create ECR Repository if not exists
+      - name: Create ECR Repo if not exists
         run: |
-          aws ecr describe-repositories --repository-names "$ECR_REPO" || \
-          aws ecr create-repository --repository-name "$ECR_REPO" \
+          aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" || \
+          aws ecr create-repository --repository-name "$ECR_REPO_NAME" \
             --image-scanning-configuration scanOnPush=true \
             --region $AWS_REGION
 
-      - name: Build Docker Image
+      - name: Build and Push Docker Image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REPO:$IMAGE_TAG .
+          docker build -t $ECR_REPO_NAME:$IMAGE_TAG .
+          docker tag $ECR_REPO_NAME:$IMAGE_TAG ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG
 
-      - name: Tag Docker Image
+      - name: Register New Task Definition Revision
+        id: task-def
         run: |
-          docker tag $ECR_REPO:$IMAGE_TAG $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+          TASK_DEF=$(aws ecs describe-task-definition --task-definition $SERVICE_NAME)
+          NEW_TASK_DEF=$(echo "$TASK_DEF" | jq --arg IMAGE "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:${{ github.sha }}" '.taskDefinition.containerDefinitions[0].image = $IMAGE')
+          echo "$NEW_TASK_DEF" > new-task-def.json
+          aws ecs register-task-definition \
+            --cli-input-json file://new-task-def.json
 
-      - name: Push Docker Image
+      - name: Update ECS Service
         run: |
-          docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:$IMAGE_TAG
+          NEW_REVISION=$(aws ecs describe-task-definition --task-definition $SERVICE_NAME | jq -r '.taskDefinition.revision')
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --task-definition $SERVICE_NAME:$NEW_REVISION \
+            --force-new-deployment
