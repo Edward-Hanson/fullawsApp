@@ -1,43 +1,30 @@
-name: Build, Push, and Deploy to Amazon ECS via ECR
+name: Build and Deploy Spring Boot App to ECS
 
 on:
   push:
-    branches: ["master"]
+    branches: [ main ]
 
 env:
-  AWS_REGION: eu-west-1
-  ECR_REPO_NAME: cloudbasedproject-repo
-  SERVICE_NAME: w5lab-CloudBasedService-pPOm3dfdVdTf
-  CLUSTER_NAME: w5lab-ECSCluster-lpPrZUsOAKYk
-  CONTAINER_NAME: cloudbased-container
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPOSITORY: cloudbasedproject-repo
+  IMAGE_TAG: latest
 
 jobs:
   build-and-deploy:
-    name: Build Docker Image and Deploy
+    name: Build, Push to ECR, and Deploy via CodeDeploy
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
-      - name: Checkout Source
+
+      - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Cache Maven Packages
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven
-
-      - name: Build JAR File
-        run: mvn clean package -DskipTests
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -47,50 +34,38 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Create ECR Repo if not exists
+      - name: Create ECR repo if not exists
         run: |
-          aws ecr describe-repositories --repository-names "$ECR_REPO_NAME" || \
-          aws ecr create-repository --repository-name "$ECR_REPO_NAME" \
-            --image-scanning-configuration scanOnPush=true \
-            --region $AWS_REGION
+          aws ecr describe-repositories --repository-names $ECR_REPOSITORY || \
+          aws ecr create-repository --repository-name $ECR_REPOSITORY
 
-      - name: Build and Push Docker Image
-        env:
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Build Docker image
         run: |
-          docker build -t $ECR_REPO_NAME:$IMAGE_TAG .
-          docker tag $ECR_REPO_NAME:$IMAGE_TAG ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:$IMAGE_TAG
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
-      - name: Register New Task Definition Revision
+      - name: Tag image with full ECR URI
         run: |
-          jq \
-            --arg IMAGE "${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPO_NAME:${{ github.sha }}" \
-            '.containerDefinitions[0].image = $IMAGE' \
-            ecs-task-def.json > new-task-def.json
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ECR_URI="$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPOSITORY"
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_URI:$IMAGE_TAG
+          echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
 
-          aws ecs register-task-definition \
-            --cli-input-json file://new-task-def.json
-
-      - name: Update ECS Service
-        env:
-          SERVICE_NAME: ${{ env.SERVICE_NAME }}
-          CLUSTER_NAME: ${{ env.CLUSTER_NAME }}
+      - name: Push image to ECR
         run: |
-          echo "Service Name: $SERVICE_NAME"
-          echo "Cluster Name: $CLUSTER_NAME"
+          docker push $ECR_URI:$IMAGE_TAG
 
-          NEW_REVISION=$(aws ecs list-task-definitions \
-            --family-prefix "$SERVICE_NAME" \
-            --sort DESC \
-            --max-items 1 \
-            --query "taskDefinitionArns[0]" \
-            --output text)
+      - name: Generate imagedefinitions.json
+        run: |
+          echo '[{
+            "name": "springboot-container",
+            "imageUri": "'"$ECR_URI:$IMAGE_TAG"'"
+          }]' > imagedefinitions.json
 
-          echo "Latest task revision: $NEW_REVISION"
-
-          aws ecs update-service \
-            --cluster "$CLUSTER_NAME" \
-            --service "$SERVICE_NAME" \
-            --task-definition "$NEW_REVISION" \
-            --force-new-deployment
+      - name: Deploy to ECS via CodeDeploy
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: imagedefinitions.json
+          service: cloudbasedproject-service
+          cluster: cloudbasedproject-cluster
+          codedeploy-app-name: cloudbasedproject-codedeploy
+          codedeploy-deployment-group: cloudbasedproject-deployment-group

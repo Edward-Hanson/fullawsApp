@@ -25,3 +25,13 @@ aws:
 
 server:
   port: 2020
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
