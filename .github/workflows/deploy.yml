@@ -39,6 +39,9 @@ jobs:
           aws ecr describe-repositories --repository-names $ECR_REPOSITORY || \
           aws ecr create-repository --repository-name $ECR_REPOSITORY
 
+      - name: Build Spring Boot JAR
+        run: mvn clean package -DskipTests
+
       - name: Build Docker image
         run: |
           docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
