@@ -19,7 +19,6 @@ jobs:
       id-token: write
 
     steps:
-
       - name: Checkout source code
         uses: actions/checkout@v4
 
@@ -59,16 +58,14 @@ jobs:
 
       - name: Generate imagedefinitions.json
         run: |
-          echo '[{
-            "name": "springboot-container",
-            "imageUri": "'"$ECR_URI:$IMAGE_TAG"'"
-          }]' > imagedefinitions.json
+          echo '[{"name":"springboot-container","imageUri":"'"$ECR_URI:$IMAGE_TAG"'"}]' > imagedefinitions.json
 
-      - name: Deploy to ECS via CodeDeploy
+      - name: Deploy to ECS using CodeDeploy
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: imagedefinitions.json
-          service: cloudbasedproject-service
           cluster: cloudbasedproject-cluster
-          codedeploy-app-name: cloudbasedproject-codedeploy
+          service: cloudbasedproject-service
+          codedeploy-application: cloudbasedproject-codedeploy
           codedeploy-deployment-group: cloudbasedproject-deployment-group
+          codedeploy-appspec: appspec.yaml
