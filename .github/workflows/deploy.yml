@@ -1,4 +1,4 @@
-name: Build and Deploy Spring Boot App to ECS
+name: Build and Deploy Spring Boot App to ECS (Blue/Green)
 
 on:
   push:
@@ -8,64 +8,66 @@ env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
   ECR_REPOSITORY: cloudbasedproject-repo
   IMAGE_TAG: latest
+  S3_BUCKET: cloudbasedproject-deployments
+  DEPLOYMENT_BUNDLE_KEY: deployment-${{ github.sha }}.zip
 
 jobs:
   build-and-deploy:
-    name: Build, Push to ECR, and Deploy via CodeDeploy
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      id-token: write
-
     steps:
+
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Set up AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
+      - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Create ECR repo if not exists
+      - name: Create ECR repository if it doesn't exist
         run: |
           aws ecr describe-repositories --repository-names $ECR_REPOSITORY || \
           aws ecr create-repository --repository-name $ECR_REPOSITORY
 
-      - name: Build Spring Boot JAR
+      - name: Build Spring Boot JAR (skip tests)
         run: mvn clean package -DskipTests
 
       - name: Build Docker image
-        run: |
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+        run: docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
 
-      - name: Tag image with full ECR URI
+      - name: Tag and push Docker image to ECR
         run: |
           ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
           ECR_URI="$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPOSITORY"
           docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_URI:$IMAGE_TAG
-          echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
-
-      - name: Push image to ECR
-        run: |
           docker push $ECR_URI:$IMAGE_TAG
+          echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
 
       - name: Generate imagedefinitions.json
         run: |
-          echo '[{"name":"springboot-container","imageUri":"'"$ECR_URI:$IMAGE_TAG"'"}]' > imagedefinitions.json
+          echo '[{
+            "name": "springboot-container",
+            "imageUri": "'"$ECR_URI:$IMAGE_TAG"'"
+          }]' > imagedefinitions.json
 
-      - name: Deploy to ECS using CodeDeploy
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: imagedefinitions.json
-          cluster: cloudbasedproject-cluster
-          service: cloudbasedproject-service
-          codedeploy-application: cloudbasedproject-codedeploy
-          codedeploy-deployment-group: cloudbasedproject-deployment-group
-          codedeploy-appspec: appspec.yaml
+      - name: Zip deployment bundle (appspec.yaml + imagedefinitions.json)
+        run: zip $DEPLOYMENT_BUNDLE_KEY appspec.yaml imagedefinitions.json
+
+      - name: Upload deployment bundle to S3
+        run: |
+          aws s3 cp $DEPLOYMENT_BUNDLE_KEY s3://$S3_BUCKET/$DEPLOYMENT_BUNDLE_KEY
+
+      - name: Create CodeDeploy deployment
+        run: |
+          aws deploy create-deployment \
+            --application-name cloudbasedproject-codedeploy \
+            --deployment-group-name cloudbasedproject-deployment-group \
+            --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
+            --s3-location bucket=$S3_BUCKET,key=$DEPLOYMENT_BUNDLE_KEY,bundleType=zip \
+            --description "GitHub Actions deployment - $GITHUB_SHA"
