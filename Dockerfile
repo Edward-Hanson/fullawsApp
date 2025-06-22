@@ -9,5 +9,5 @@ ENV AWS_REGION=eu-west-1
 
 EXPOSE 2020
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT [ "sh", "-c", "echo SPRING_DATASOURCE_URL=$SPRING_DATASOURCE_URL && java -jar app.jar" ]
 
