@@ -1,73 +1,38 @@
-name: Build and Deploy Spring Boot App to ECS (Blue/Green)
+name: Deploy ECS App via CodeDeploy
 
 on:
-  push:
-    branches: [ master ]
-
-env:
-  AWS_REGION: ${{ secrets.AWS_REGION }}
-  ECR_REPOSITORY: cloudbasedproject-repo
-  IMAGE_TAG: latest
-  S3_BUCKET: cloudbasedproject-deployments
-  DEPLOYMENT_BUNDLE_KEY: deployment-${{ github.sha }}.zip
+  workflow_dispatch:
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Checkout source code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up AWS credentials
+      - name: Download imagedefinitions.json
+        uses: actions/download-artifact@v4
+        with:
+          name: image-defs
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Log in to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Create ECR repository if it doesn't exist
+      - name: Upload artifacts to S3
         run: |
-          aws ecr describe-repositories --repository-names $ECR_REPOSITORY || \
-          aws ecr create-repository --repository-name $ECR_REPOSITORY
+          aws s3 cp appspec.yaml s3://your-s3-bucket/
+          aws s3 cp imagedefinitions.json s3://your-s3-bucket/
 
-      - name: Build Spring Boot JAR (skip tests)
-        run: mvn clean package -DskipTests
-
-      - name: Build Docker image
-        run: docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
-
-      - name: Tag and push Docker image to ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          ECR_URI="$ACCOUNT_ID.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/$ECR_REPOSITORY"
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_URI:$IMAGE_TAG
-          docker push $ECR_URI:$IMAGE_TAG
-          echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
-
-      - name: Generate imagedefinitions.json
-        run: |
-          echo '[{
-            "name": "springboot-container",
-            "imageUri": "'"$ECR_URI:$IMAGE_TAG"'"
-          }]' > imagedefinitions.json
-
-      - name: Zip deployment bundle (appspec.yaml + imagedefinitions.json)
-        run: zip $DEPLOYMENT_BUNDLE_KEY appspec.yaml imagedefinitions.json
-
-      - name: Upload deployment bundle to S3
-        run: |
-          aws s3 cp $DEPLOYMENT_BUNDLE_KEY s3://$S3_BUCKET/$DEPLOYMENT_BUNDLE_KEY
-
-      - name: Create CodeDeploy deployment
+      - name: Create deployment
         run: |
           aws deploy create-deployment \
             --application-name cloudbasedproject-codedeploy \
             --deployment-group-name cloudbasedproject-deployment-group \
-            --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
-            --s3-location bucket=$S3_BUCKET,key=$DEPLOYMENT_BUNDLE_KEY,bundleType=zip \
-            --description "GitHub Actions deployment - $GITHUB_SHA"
+            --s3-location bucket=your-s3-bucket,bundleType=YAML,key=appspec.yaml \
+            --file-exists-behavior OVERWRITE \
+            --description "Auto deployment from GitHub"
