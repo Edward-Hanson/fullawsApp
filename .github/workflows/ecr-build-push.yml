@@ -3,10 +3,6 @@ name: Build and Push Docker Image to ECR
 on:
   push:
     branches: [ master ]
-    paths:
-      - 'Dockerfile'
-      - '**/*.java'
-      - 'pom.xml'
 
 jobs:
   build-and-push:
