@@ -67,33 +67,20 @@ jobs:
 
       - name: Trigger Blue/Green Deployment
         run: |
-          echo "{
-            \"applicationName\": \"${{ env.PROJECT_NAME }}-app\",
-            \"deploymentGroupName\": \"${{ env.PROJECT_NAME }}-deployment-group\",
-            \"revision\": {
-              \"revisionType\": \"AppSpecContent\",
-              \"appSpecContent\": {
-                \"content\": \"{
-                  \\\"version\\\": 1,
-                  \\\"Resources\\\": [
-                    {
-                      \\\"TargetService\\\": {
-                        \\\"Type\\\": \\\"AWS::ECS::Service\\\",
-                        \\\"Properties\\\": {
-                          \\\"TaskDefinition\\\": \\\"${TASK_DEF_ARN}\\\",
-                          \\\"LoadBalancerInfo\\\": {
-                            \\\"ContainerName\\\": \\\"${{ env.PROJECT_NAME }}-container\\\",
-                            \\\"ContainerPort\\\": 2020
-                          }
-                        }
-                      }
-                    }
-                  ]
-                }\"
+          cat <<EOF > appspec.json
+          {
+            "applicationName": "${{ env.PROJECT_NAME }}-app",
+            "deploymentGroupName": "${{ env.PROJECT_NAME }}-deployment-group",
+            "revision": {
+              "revisionType": "AppSpecContent",
+              "appSpecContent": {
+                "content": "{ \"version\": 1, \"Resources\": [ { \"TargetService\": { \"Type\": \"AWS::ECS::Service\", \"Properties\": { \"TaskDefinition\": \"${TASK_DEF_ARN}\", \"LoadBalancerInfo\": { \"ContainerName\": \"${{ env.PROJECT_NAME }}-container\", \"ContainerPort\": 2020 } } } } ] }"
               }
             }
-          }" > deploy-payload.json
-
+          }
+          EOF
+      
           aws deploy create-deployment \
-            --cli-input-json file://deploy-payload.json \
-            --region ${{ env.AWS_REGION }}
+          --cli-input-json file://appspec.json \
+          --region ${{ env.AWS_REGION }}
+      
