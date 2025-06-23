@@ -1,0 +1,48 @@
+name: ECS Blue/Green Deployment
+
+on:
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-west-1
+  PROJECT_NAME: cloudbasedproject
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::343218213563:role/GitHubActionsDeploymentRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Register new Task Definition revision
+        id: task-def
+        run: |
+          FAMILY=${{ env.PROJECT_NAME }}-task
+          TASK_DEF_ARN=$(aws ecs list-task-definitions \
+            --family-prefix $FAMILY \
+            --sort DESC \
+            --max-items 1 \
+            --query "taskDefinitionArns[0]" --output text)
+          echo "Latest task definition: $TASK_DEF_ARN"
+          echo "TASK_DEF_ARN=$TASK_DEF_ARN" >> $GITHUB_ENV
+
+      - name: Trigger CodeDeploy Deployment
+        run: |
+          aws deploy create-deployment \
+            --application-name ${{ env.PROJECT_NAME }}-app \
+            --deployment-group-name ${{ env.PROJECT_NAME }}-deployment-group \
+            --deployment-config-name CodeDeployDefault.ECSAllAtOnce \
+            --region ${{ env.AWS_REGION }} \
+            --deployment-style deploymentType=BLUE_GREEN,deploymentOption=WITH_TRAFFIC_CONTROL \
+            --target-revision '{"revisionType": "AppSpecContent", "appSpecContent": { "content": "{ \"version\": 1, \"Resources\": [ { \"TargetService\": { \"Type\": \"AWS::ECS::Service\", \"Properties\": { \"TaskDefinition\": \"'${TASK_DEF_ARN}'\", \"LoadBalancerInfo\": { \"ContainerName\": \"${{ env.PROJECT_NAME }}-container\", \"ContainerPort\": 2020 } } } } ] }" }}'
