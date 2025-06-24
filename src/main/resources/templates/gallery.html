@@ -43,7 +43,7 @@
         }
     </style>
 </head>
-<div th:if="${error}" class="error-banner">
+<div th:if="${error}" class="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
     <span th:text="${error}">An unexpected error occurred</span>
     <span class="error-banner-close" onclick="this.parentElement.style.display='none';">&times;</span>
 </div>
