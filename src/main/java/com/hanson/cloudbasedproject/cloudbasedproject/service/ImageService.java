@@ -8,13 +8,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetUrlRequest;
@@ -55,7 +55,10 @@ public class ImageService {
     }
 
     public Page<?> home(int page){
-        return imageRepo.findAll(PageRequest.of(page,6));
+        long count = imageRepo.count();
+        int totalPages = (int) Math.ceil((double) count / 6.0);
+        int safePage = (page < 0 || page >= totalPages) ? 0 : page;
+        return imageRepo.findAll(PageRequest.of(safePage,6));
     }
 
     public ImageTransfer downloadImage(Long id) throws IOException {
@@ -78,5 +81,17 @@ public class ImageService {
                         .key(meta.getFilename())
                         .build());
         return new InputStreamResource(stream);
+    }
+
+    public void deleteImage(Long id) throws IOException {
+        ImageMetadata meta = imageRepo.findById(id)
+                .orElseThrow(() -> new FileNotFoundException("Image not found"));
+
+        s3Client.deleteObject(DeleteObjectRequest.builder()
+                .bucket(bucketName)
+                .key(meta.getFilename())
+                .build());
+
+        imageRepo.delete(meta);
     }
 }

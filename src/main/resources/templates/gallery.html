@@ -12,8 +12,41 @@
         .animate-zoom {
             animation: zoomIn 0.3s ease-out forwards;
         }
+         .error-banner {
+             background: linear-gradient(to right, #ffdddd, #ffeaea);
+             color: #b10000;
+             border: 1px solid #ff5f5f;
+             border-left: 6px solid #d10000;
+             padding: 15px 20px;
+             margin: 20px auto;
+             border-radius: 6px;
+             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+             font-size: 15px;
+             max-width: 700px;
+             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+             position: relative;
+         }
+
+        .error-banner::before {
+            content: "⚠️ ";
+            font-size: 18px;
+            margin-right: 5px;
+        }
+
+        .error-banner-close {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            color: #900;
+            cursor: pointer;
+            font-weight: bold;
+        }
     </style>
 </head>
+<div th:if="${error}" class="error-banner">
+    <span th:text="${error}">An unexpected error occurred</span>
+    <span class="error-banner-close" onclick="this.parentElement.style.display='none';">&times;</span>
+</div>
 <body class="bg-gradient-to-br from-gray-50 to-blue-100 min-h-screen relative">
 <div class="max-w-7xl mx-auto p-6">
     <!-- Header -->
@@ -51,16 +84,33 @@
                 <span th:text="${img.filename}">Filename</span>
             </div>
 
-            <div class="mt-2">
+            <div class="mt-4 flex justify-end items-center gap-4">
                 <a th:href="@{'/download/' + ${img.id}}"
-                   class="inline-block text-sm text-blue-600 hover:underline"
-                   download>Download</a>
+                   class="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium transition"
+                   download>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/>
+                    </svg>
+                    Download
+                </a>
+
+                <button type="button"
+                        th:attr="data-id=${img.id}, data-name=${img.filename}"
+                        class="flex items-center gap-1 text-sm text-red-600 hover:text-red-800 font-medium transition confirm-delete">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M9 7h6m-1-2h-4m2-2v2"/>
+                    </svg>
+                    Delete
+                </button>
             </div>
+
         </div>
     </div>
 
     <!-- Pagination -->
-    <div class="flex justify-center mt-12 flex-wrap gap-2">
+    <div th:if="${images.totalPages > 1}" class="flex justify-center mt-12 flex-wrap gap-2">
         <a th:if="${images.hasPrevious()}" th:href="@{'/?page=' + ${images.number - 1}}"
            class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition">⟨ Prev</a>
 
@@ -86,12 +136,56 @@
         </button>
     </div>
 </div>
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="fixed inset-0 bg-black bg-opacity-70 hidden items-center justify-center z-50">
+    <div class="bg-white p-6 rounded-lg shadow-2xl max-w-sm w-full animate-zoom text-center">
+        <h2 class="text-xl font-bold text-gray-800 mb-4">Confirm Deletion</h2>
+        <p class="text-gray-600 mb-4">Are you sure you want to delete <span id="deleteFilename" class="font-semibold text-red-500"></span>?</p>
+        <form id="deleteForm" method="post">
+            <input type="hidden" name="_method" value="delete"/>
+            <div class="flex justify-center gap-4">
+                <button type="button" onclick="hideDeleteModal()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded">
+                    Cancel
+                </button>
+                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded">
+                    Delete
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <!-- JavaScript -->
 <script>
     const modal = document.getElementById('previewModal');
     const imgTag = document.getElementById('previewImage');
     const filenameTag = document.getElementById('previewFilename');
+
+    const deleteModal = document.getElementById('deleteModal');
+    const deleteFilename = document.getElementById('deleteFilename');
+    const deleteForm = document.getElementById('deleteForm');
+
+    document.querySelectorAll('.confirm-delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-id');
+            const name = btn.getAttribute('data-name');
+            deleteForm.setAttribute('action', `/delete/${id}`);
+            deleteFilename.textContent = name;
+            deleteModal.classList.remove('hidden');
+            deleteModal.classList.add('flex');
+        });
+    });
+
+    function hideDeleteModal() {
+        deleteModal.classList.remove('flex');
+        deleteModal.classList.add('hidden');
+        deleteForm.setAttribute('action', '');
+        deleteFilename.textContent = '';
+    }
+
+    deleteModal.addEventListener('click', (e) => {
+        if (e.target === deleteModal) hideDeleteModal();
+    });
 
     function showPreview(imageUrl, filename) {
         imgTag.src = imageUrl;

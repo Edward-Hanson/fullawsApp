@@ -48,4 +48,10 @@ public class ImageController {
     public ResponseEntity<InputStreamResource> renderImage(@PathVariable Long id) throws IOException {
         return ResponseEntity.ok().body(imageService.renderImage(id));
     }
+
+    @PostMapping("/delete/{id}")
+    public String delete(@PathVariable Long id) throws IOException {
+        imageService.deleteImage(id);
+        return "redirect:/";
+    }
 }
