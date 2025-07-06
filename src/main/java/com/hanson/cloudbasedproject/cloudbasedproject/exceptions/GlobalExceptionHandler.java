@@ -23,6 +23,10 @@ public class GlobalExceptionHandler {
     public String handleAllExceptions(Exception ex,
                                       HttpServletRequest request,
                                       RedirectAttributes redirectAttributes) {
+        String uri = request.getRequestURI();
+        if (uri.equals("/favicon.ico")) {
+            return null;
+        }
         redirectAttributes.addFlashAttribute("error", "Oops! An error occurred 😒🤷‍♂️🤦‍♂️");
         return "redirect:" + request.getHeader("Referer");
     }
