@@ -43,7 +43,7 @@
         }
     </style>
 </head>
-<div th:if="${error}" class="error-banner">
+<div th:if="${error} and ${#httpServletRequest.requestURI != '/favicon.ico'}" class="error-banner">
     <span th:text="${error}">An unexpected error occurred</span>
     <span class="error-banner-close" onclick="this.parentElement.style.display='none';">&times;</span>
 </div>
